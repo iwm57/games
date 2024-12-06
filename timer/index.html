@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reaction Time Game</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      margin-top: 20%;
+    }
+    #result {
+      font-size: 1.5rem;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Reaction Time Game</h1>
+  <p>Tap as close to 3.00000 seconds as possible!</p>
+  <button id="startButton">Start</button>
+  <div id="result"></div>
+
+  <script>
+    let startTime;
+
+    document.getElementById("startButton").addEventListener("click", () => {
+      document.getElementById("result").textContent = "";
+      startTime = performance.now();
+      document.body.addEventListener("click", handleTap, { once: true });
+    });
+
+    function handleTap() {
+      const elapsed = (performance.now() - startTime) / 1000;
+      document.getElementById("result").textContent =
+        `You tapped after ${elapsed.toFixed(5)} seconds. The goal was 3.00000 seconds.`;
+    }
+  </script>
+</body>
+</html>

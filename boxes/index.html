@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Dots and Boxes</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  body {
+    font-family: 'Quicksand', sans-serif;
+    background: linear-gradient(135deg, #f7f7f7, #eaeaea);
+    margin: 0; 
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    color: #333;
+  }
+
+  header {
+    text-align: center;
+    margin: 30px 0 20px 0;
+  }
+
+  h1 {
+    margin: 0;
+    font-size: 28px;
+    color: #333;
+    font-weight: 600;
+    letter-spacing: 1px;
+  }
+
+  #main-container {
+    background: #ffffff;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    border-radius: 10px;
+    padding: 20px;
+    max-width: 400px;
+    width: 90vw;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  #game-info {
+    margin-bottom: 20px;
+    font-size: 16px;
+    text-align: center;
+  }
+
+  #game-info span {
+    display: inline-block;
+    margin: 0 10px;
+  }
+
+  #turnInfo {
+    display: block;
+    margin-top: 5px;
+    font-weight: 600;
+  }
+
+  #game-controls {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+
+  select, .btn {
+    font-family: 'Quicksand', sans-serif;
+    padding: 8px 14px;
+    font-size: 14px;
+    border-radius: 5px;
+    border: none;
+    outline: none;
+    cursor: pointer;
+  }
+
+  select {
+    background: #f0f0f0;
+    color: #333;
+  }
+
+  .btn {
+    background: #007BFF;
+    color: #fff;
+    transition: background 0.3s;
+  }
+
+  .btn:hover {
+    background: #0056b3;
+  }
+
+  #gameCanvasContainer {
+    position: relative;
+    width: 90%;
+    max-width: 320px;
+    margin-bottom: 20px;
+  }
+
+  #gameCanvas {
+    background: #fff;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    width: 100%;
+    height: auto;
+    touch-action: none; /* For mobile better support */
+    display: block;
+    margin: 0 auto;
+  }
+
+  /* Modal styling */
+  #instructionsModal {
+    display: none; 
+    position: fixed; 
+    z-index: 999;
+    left: 0;
+    top: 0;
+    width: 100%; 
+    height: 100%; 
+    overflow: auto;
+    background-color: rgba(0,0,0,0.4); 
+  }
+
+  #instructionsContent {
+    background: #fff;
+    margin: 10% auto;
+    max-width: 90%;
+    width: 400px;
+    padding: 20px;
+    border-radius: 10px;
+    position: relative;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+  }
+
+  #instructionsContent h2 {
+    margin-top: 0;
+    font-weight: 600;
+  }
+
+  #instructionsContent p {
+    line-height: 1.5em;
+    margin-bottom: 10px;
+  }
+
+  #closeInstructions {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: transparent;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    color: #888;
+  }
+
+  #closeInstructions:hover {
+    color: #333;
+  }
+
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Dots and Boxes</h1>
+</header>
+
+<div id="main-container">
+  <div id="game-info">
+    <span>Player 1 (Red): <span id="scoreP1">0</span></span>
+    <span>Player 2 (Blue): <span id="scoreP2">0</span></span>
+    <span id="turnInfo">Turn: Player 1</span>
+  </div>
+
+  <div id="game-controls">
+    <select id="boardSizeSelect">
+      <option value="4">Easy (3x3 boxes)</option>
+      <option value="5" selected>Medium (4x4 boxes)</option>
+      <option value="6">Hard (5x5 boxes)</option>
+    </select>
+    <button id="reset-btn" class="btn">Restart</button>
+    <button id="instructions-btn" class="btn">How to Play</button>
+  </div>
+
+  <div id="gameCanvasContainer">
+    <canvas id="gameCanvas" width="300" height="300"></canvas>
+  </div>
+</div>
+
+<!-- Modal for instructions -->
+<div id="instructionsModal">
+  <div id="instructionsContent">
+    <button id="closeInstructions">&times;</button>
+    <h2>How to Play</h2>
+    <p>Dots and Boxes is a two-player game played on a grid of dots. Players take turns to draw a line between two adjacent dots (horizontally or vertically). Completing the fourth side of a box earns you one point.</p>
+    <p>When you complete a box, you get an extra turn. Keep playing until all boxes are claimed. The player with the most boxes at the end wins!</p>
+  </div>
+</div>
+
+<script>
+(function() {
+  let rows = 5; 
+  let cols = 5;
+
+  let lineThickness = 4;
+  let dotRadius = 6;
+  let margin = 30; 
+  let playerColors = ["red", "blue"];
+  let currentPlayer = 0; 
+  let score = [0, 0];
+  let horizontalLines, verticalLines, boxes;
+
+  const canvas = document.getElementById('gameCanvas');
+  const ctx = canvas.getContext('2d');
+  const width = canvas.width;
+  const height = canvas.height;
+
+  function initGame() {
+    const selectedSize = parseInt(document.getElementById('boardSizeSelect').value,10);
+    rows = selectedSize;
+    cols = selectedSize;
+
+    horizontalLines = [];
+    for (let r = 0; r < rows; r++) {
+      horizontalLines[r] = [];
+      for (let c = 0; c < cols - 1; c++) {
+        horizontalLines[r][c] = false;
+      }
+    }
+
+    verticalLines = [];
+    for (let r = 0; r < rows - 1; r++) {
+      verticalLines[r] = [];
+      for (let c = 0; c < cols; c++) {
+        verticalLines[r][c] = false;
+      }
+    }
+
+    boxes = [];
+    for (let r = 0; r < rows - 1; r++) {
+      boxes[r] = [];
+      for (let c = 0; c < cols - 1; c++) {
+        boxes[r][c] = null;
+      }
+    }
+
+    currentPlayer = 0;
+    score = [0, 0];
+    updateInfo();
+    drawGame();
+  }
+
+  function updateInfo() {
+    document.getElementById('scoreP1').textContent = score[0];
+    document.getElementById('scoreP2').textContent = score[1];
+    document.getElementById('turnInfo').textContent = "Turn: Player " + (currentPlayer+1);
+  }
+
+  function drawGame() {
+    ctx.clearRect(0, 0, width, height);
+    const boxWidth = (width - 2 * margin) / (cols - 1);
+    const boxHeight = (height - 2 * margin) / (rows - 1);
+
+    // Draw completed boxes
+    for (let r = 0; r < rows - 1; r++) {
+      for (let c = 0; c < cols - 1; c++) {
+        if (boxes[r][c] !== null) {
+          ctx.fillStyle = playerColors[boxes[r][c]];
+          ctx.fillRect(
+            margin + c*boxWidth + lineThickness/2,
+            margin + r*boxHeight + lineThickness/2,
+            boxWidth - lineThickness,
+            boxHeight - lineThickness
+          );
+        }
+      }
+    }
+
+    ctx.lineWidth = lineThickness;
+    ctx.lineCap = "round";
+
+    // Draw horizontal lines
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols - 1; c++) {
+        if (horizontalLines[r][c]) {
+          ctx.strokeStyle = horizontalLines[r][c];
+          ctx.beginPath();
+          ctx.moveTo(margin + c*boxWidth, margin + r*boxHeight);
+          ctx.lineTo(margin + (c+1)*boxWidth, margin + r*boxHeight);
+          ctx.stroke();
+        }
+      }
+    }
+
+    // Draw vertical lines
+    for (let r = 0; r < rows - 1; r++) {
+      for (let c = 0; c < cols; c++) {
+        if (verticalLines[r][c]) {
+          ctx.strokeStyle = verticalLines[r][c];
+          ctx.beginPath();
+          ctx.moveTo(margin + c*boxWidth, margin + r*boxHeight);
+          ctx.lineTo(margin + c*boxWidth, margin + (r+1)*boxHeight);
+          ctx.stroke();
+        }
+      }
+    }
+
+    // Draw dots
+    ctx.fillStyle = "#333";
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        ctx.beginPath();
+        ctx.arc(margin + c*boxWidth, margin + r*boxHeight, dotRadius, 0, Math.PI*2);
+        ctx.fill();
+      }
+    }
+  }
+
+  function distanceToSegment(px,py,x1,y1,x2,y2) {
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const lenSq = dx*dx + dy*dy;
+    let t = ((px - x1)*dx + (py - y1)*dy) / lenSq;
+    t = Math.max(0, Math.min(1, t));
+    const xx = x1 + t*dx;
+    const yy = y1 + t*dy;
+    return Math.sqrt((px - xx)*(px - xx)+(py - yy)*(py - yy));
+  }
+
+  function getLineFromCoordinates(x, y) {
+    const boxWidth = (width - 2 * margin) / (cols - 1);
+    const boxHeight = (height - 2 * margin) / (rows - 1);
+
+    // Check horizontal lines
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols - 1; c++) {
+        if (!horizontalLines[r][c]) {
+          const x1 = margin + c*boxWidth;
+          const y1 = margin + r*boxHeight;
+          const x2 = margin + (c+1)*boxWidth;
+          const y2 = y1;
+          if (distanceToSegment(x,y,x1,y1,x2,y2) < 10) {
+            return {type: "H", row: r, col: c};
+          }
+        }
+      }
+    }
+
+    // Check vertical lines
+    for (let r = 0; r < rows - 1; r++) {
+      for (let c = 0; c < cols; c++) {
+        if (!verticalLines[r][c]) {
+          const x1 = margin + c*boxWidth;
+          const y1 = margin + r*boxHeight;
+          const x2 = x1;
+          const y2 = margin + (r+1)*boxHeight;
+          if (distanceToSegment(x,y,x1,y1,x2,y2) < 10) {
+            return {type: "V", row: r, col: c};
+          }
+        }
+      }
+    }
+
+    return null;
+  }
+
+  canvas.addEventListener('click', function(e) {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const x = (e.clientX - rect.left)*scaleX;
+    const y = (e.clientY - rect.top)*scaleY;
+    const line = getLineFromCoordinates(x,y);
+    if (line) {
+      drawLine(line);
+    }
+  });
+
+  function drawLine(line) {
+    let changedPlayer = true;
+    const color = playerColors[currentPlayer];
+    if (line.type === "H") {
+      horizontalLines[line.row][line.col] = color;
+    } else {
+      verticalLines[line.row][line.col] = color;
+    }
+
+    const completedBoxes = checkBoxesCompleted(line);
+    if (completedBoxes > 0) {
+      score[currentPlayer] += completedBoxes;
+      // Player gets another turn, so we do not change the player
+      changedPlayer = false;
+    }
+
+    drawGame();
+    updateInfo();
+    if (isGameOver()) {
+      endGame();
+      return;
+    }
+    if (changedPlayer) {
+      currentPlayer = (currentPlayer+1)%2;
+      updateInfo();
+    }
+  }
+
+  function checkBoxesCompleted(line) {
+    let completed = 0;
+    if (line.type === "H") {
+      const r = line.row;
+      const c = line.col;
+      if (r > 0 && isBoxComplete(r-1,c)) {
+        boxes[r-1][c] = currentPlayer;
+        completed++;
+      }
+      if (r < rows-1 && isBoxComplete(r,c)) {
+        boxes[r][c] = currentPlayer;
+        completed++;
+      }
+    } else {
+      const r = line.row;
+      const c = line.col;
+      if (c > 0 && isBoxComplete(r,c-1)) {
+        boxes[r][c-1] = currentPlayer;
+        completed++;
+      }
+      if (c < cols-1 && isBoxComplete(r,c)) {
+        boxes[r][c] = currentPlayer;
+        completed++;
+      }
+    }
+    return completed;
+  }
+
+  function isBoxComplete(r,c) {
+    return horizontalLines[r][c] && horizontalLines[r+1][c] && verticalLines[r][c] && verticalLines[r][c+1];
+  }
+
+  function isGameOver() {
+    for (let r = 0; r < rows - 1; r++) {
+      for (let c = 0; c < cols - 1; c++) {
+        if (boxes[r][c] === null) return false;
+      }
+    }
+    return true;
+  }
+
+  function endGame() {
+    let winner = null;
+    if (score[0] > score[1]) winner = 1;
+    else if (score[1] > score[0]) winner = 2;
+
+    if (winner) {
+      alert("Game Over! Player " + winner + " wins!");
+    } else {
+      alert("Game Over! It's a tie.");
+    }
+  }
+
+  document.getElementById('reset-btn').addEventListener('click', initGame);
+  document.getElementById('boardSizeSelect').addEventListener('change', initGame);
+
+  // Instructions modal
+  const instructionsBtn = document.getElementById('instructions-btn');
+  const instructionsModal = document.getElementById('instructionsModal');
+  const closeInstructions = document.getElementById('closeInstructions');
+
+  instructionsBtn.onclick = function() {
+    instructionsModal.style.display = "block";
+  }
+
+  closeInstructions.onclick = function() {
+    instructionsModal.style.display = "none";
+  }
+
+  window.onclick = function(event) {
+    if (event.target === instructionsModal) {
+      instructionsModal.style.display = "none";
+    }
+  }
+
+  // Start the game initially
+  initGame();
+})();
+</script>
+
+</body>
+</html>

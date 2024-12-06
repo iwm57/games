@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<!-- Ensures better scaling on mobile devices -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Reversi (Othello)</title>
+<style>
+  body {
+    margin: 0;
+    padding: 0;
+    font-family: sans-serif;
+    background: #1f1f1f;
+    color: #ffffff;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  header {
+    text-align: center;
+    padding: 2vw;
+  }
+  
+  header h1 {
+    margin: 2vw 0;
+    font-size: 6vw;
+  }
+
+  #game-info {
+    margin-bottom: 2vw;
+  }
+
+  #scoreboard {
+    margin: 1vw 0;
+    display: flex;
+    justify-content: center;
+    gap: 5vw;
+    font-size: 4vw;
+  }
+
+  #turn-indicator {
+    margin-top: 1vw;
+    font-size: 4vw;
+  }
+
+  #board {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    grid-template-rows: repeat(8, 1fr);
+    width: 90vw;    /* Fill most of the viewport width on mobile */
+    height: 90vw;   /* Keep a square shape */
+    box-sizing: border-box;
+    border: 2px solid #333;
+    background: #0f621f;
+  }
+
+  .cell {
+    border: 1px solid #005016;
+    position: relative;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .cell:hover {
+    background: #19742c;
+  }
+
+  .piece {
+    width: 70%;
+    height: 70%;
+    border-radius: 50%;
+    box-shadow: inset 0 0 3px rgba(0,0,0,0.7);
+  }
+
+  .black {
+    background: #000000;
+  }
+
+  .white {
+    background: #ffffff;
+  }
+
+  .valid-move {
+    background: #2a8f48;
+  }
+
+  #controls {
+    margin: 3vw;
+  }
+
+  button {
+    padding: 2vw 4vw;
+    background: #004a0f;
+    border: none;
+    color: #fff;
+    font-size: 4vw;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+
+  button:hover {
+    background: #00601a;
+  }
+
+  @media (min-width: 600px) {
+    /* Slightly larger text on bigger screens */
+    header h1 {
+      font-size: 1.8em;
+    }
+
+    #scoreboard {
+      font-size: 1em;
+    }
+
+    #turn-indicator {
+      font-size: 1em;
+    }
+
+    button {
+      font-size: 1em;
+    }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Reversi (Othello)</h1>
+  <div id="game-info">
+    <div id="scoreboard">
+      <div>Black: <span id="black-score">2</span></div>
+      <div>White: <span id="white-score">2</span></div>
+    </div>
+    <div id="turn-indicator">Current turn: <span id="current-player">Black</span></div>
+  </div>
+</header>
+<div id="board"></div>
+<div id="controls">
+  <button id="new-game-btn">New Game</button>
+</div>
+
+<script>
+(function() {
+  const boardElement = document.getElementById('board');
+  const blackScoreElement = document.getElementById('black-score');
+  const whiteScoreElement = document.getElementById('white-score');
+  const currentPlayerElement = document.getElementById('current-player');
+  const newGameBtn = document.getElementById('new-game-btn');
+
+  const SIZE = 8;
+  // Board will use: 0 = empty, 1 = black, 2 = white
+  let board = [];
+  let currentPlayer = 1; // 1 = black, 2 = white
+
+  const directions = [
+    [1,0], [-1,0], [0,1], [0,-1],
+    [1,1], [1,-1], [-1,1], [-1,-1]
+  ];
+
+  function initBoard() {
+    board = Array.from({length: SIZE}, () => Array(SIZE).fill(0));
+    // Starting positions
+    board[3][3] = 2;
+    board[3][4] = 1;
+    board[4][3] = 1;
+    board[4][4] = 2;
+    currentPlayer = 1;
+  }
+
+  function createBoardHTML() {
+    boardElement.innerHTML = '';
+    for (let y=0; y<SIZE; y++) {
+      for (let x=0; x<SIZE; x++) {
+        const cell = document.createElement('div');
+        cell.className = 'cell';
+        cell.dataset.x = x;
+        cell.dataset.y = y;
+        if (board[y][x] !== 0) {
+          const piece = document.createElement('div');
+          piece.className = 'piece ' + (board[y][x] === 1 ? 'black' : 'white');
+          cell.appendChild(piece);
+        }
+        boardElement.appendChild(cell);
+      }
+    }
+  }
+
+  function inBounds(x, y) {
+    return x>=0 && x<SIZE && y>=0 && y<SIZE;
+  }
+
+  function getOpponent(player) {
+    return player === 1 ? 2 : 1;
+  }
+
+  function validMoves(player) {
+    let moves = [];
+    for (let y=0; y<SIZE; y++) {
+      for (let x=0; x<SIZE; x++) {
+        if (board[y][x] === 0) {
+          if (getFlips(player, x, y).length > 0) {
+            moves.push({x, y});
+          }
+        }
+      }
+    }
+    return moves;
+  }
+
+  function getFlips(player, x, y) {
+    if (board[y][x] !== 0) return [];
+    const opp = getOpponent(player);
+    let flips = [];
+    for (let [dx, dy] of directions) {
+      let nx = x+dx, ny = y+dy;
+      let line = [];
+      while (inBounds(nx, ny) && board[ny][nx] === opp) {
+        line.push({x:nx, y:ny});
+        nx += dx; ny += dy;
+      }
+      if (inBounds(nx, ny) && board[ny][nx] === player && line.length > 0) {
+        flips = flips.concat(line);
+      }
+    }
+    return flips;
+  }
+
+  function placePiece(player, x, y) {
+    let flips = getFlips(player, x, y);
+    if (flips.length > 0) {
+      board[y][x] = player;
+      for (let f of flips) {
+        board[f.y][f.x] = player;
+      }
+      return true;
+    }
+    return false;
+  }
+
+  function updateScores() {
+    let blackCount = 0;
+    let whiteCount = 0;
+    for (let y=0; y<SIZE; y++) {
+      for (let x=0; x<SIZE; x++) {
+        if (board[y][x] === 1) blackCount++;
+        else if (board[y][x] === 2) whiteCount++;
+      }
+    }
+    blackScoreElement.textContent = blackCount;
+    whiteScoreElement.textContent = whiteCount;
+  }
+
+  function highlightValidMoves() {
+    const moves = validMoves(currentPlayer);
+    const cells = boardElement.querySelectorAll('.cell');
+    cells.forEach(cell => {
+      cell.classList.remove('valid-move');
+      const x = parseInt(cell.dataset.x);
+      const y = parseInt(cell.dataset.y);
+      if (moves.some(m => m.x===x && m.y===y)) {
+        cell.classList.add('valid-move');
+      }
+    });
+  }
+
+  function switchPlayer() {
+    currentPlayer = getOpponent(currentPlayer);
+  }
+
+  function gameOver() {
+    const blackMoves = validMoves(1);
+    const whiteMoves = validMoves(2);
+    return blackMoves.length === 0 && whiteMoves.length === 0;
+  }
+
+  function updateTurnIndicator() {
+    currentPlayerElement.textContent = currentPlayer === 1 ? 'Black' : 'White';
+  }
+
+  function nextTurn() {
+    let moves = validMoves(currentPlayer);
+    if (moves.length === 0) {
+      switchPlayer();
+      moves = validMoves(currentPlayer);
+      if (moves.length === 0) {
+        let blackCount = parseInt(blackScoreElement.textContent);
+        let whiteCount = parseInt(whiteScoreElement.textContent);
+        let winner = blackCount > whiteCount ? 'Black' : (whiteCount > blackCount ? 'White' : 'Tie');
+        alert('Game Over! ' + (winner === 'Tie' ? 'It\'s a tie!' : winner + ' wins.'));
+        return;
+      }
+    }
+    updateTurnIndicator();
+    highlightValidMoves();
+  }
+
+  boardElement.addEventListener('click', (e) => {
+    const cell = e.target.closest('.cell');
+    if (!cell) return;
+    const x = parseInt(cell.dataset.x);
+    const y = parseInt(cell.dataset.y);
+    if (placePiece(currentPlayer, x, y)) {
+      createBoardHTML();
+      updateScores();
+      switchPlayer();
+      nextTurn();
+    }
+  });
+
+  newGameBtn.addEventListener('click', () => {
+    initBoard();
+    createBoardHTML();
+    updateScores();
+    updateTurnIndicator();
+    highlightValidMoves();
+  });
+
+  // Initialize the game
+  initBoard();
+  createBoardHTML();
+  updateScores();
+  updateTurnIndicator();
+  highlightValidMoves();
+})();
+</script>
+</body>
+</html>

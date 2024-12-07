@@ -9,6 +9,20 @@
       font-family: Arial, sans-serif;
       text-align: center;
       margin-top: 20%;
+      background-color: #f7f7f7;
+    }
+    button {
+      font-size: 2rem;
+      padding: 20px 40px;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: background-color 0.3s;
+    }
+    button:hover {
+      background-color: #45a049;
     }
     #result {
       font-size: 1.5rem;
@@ -18,24 +32,32 @@
 </head>
 <body>
   <h1>Reaction Time Game</h1>
-  <p>Tap as close to 3.00000 seconds as possible!</p>
-  <button id="startButton">Start</button>
+  <p>Press "Start" to begin. Then press "Stop" when you think 3 seconds have passed!</p>
+  <button id="startStopButton">Start</button>
   <div id="result"></div>
 
   <script>
     let startTime;
+    let timerRunning = false;
 
-    document.getElementById("startButton").addEventListener("click", () => {
-      document.getElementById("result").textContent = "";
-      startTime = performance.now();
-      document.body.addEventListener("click", handleTap, { once: true });
+    const button = document.getElementById("startStopButton");
+    const resultDiv = document.getElementById("result");
+
+    button.addEventListener("click", () => {
+      if (!timerRunning) {
+        // Start the timer
+        startTime = performance.now();
+        timerRunning = true;
+        button.textContent = "Stop";
+        resultDiv.textContent = "";
+      } else {
+        // Stop the timer
+        const elapsed = (performance.now() - startTime) / 1000;
+        timerRunning = false;
+        button.textContent = "Start";
+        resultDiv.textContent = `You stopped at ${elapsed.toFixed(5)} seconds. Goal: 3.00000 seconds.`;
+      }
     });
-
-    function handleTap() {
-      const elapsed = (performance.now() - startTime) / 1000;
-      document.getElementById("result").textContent =
-        `You tapped after ${elapsed.toFixed(5)} seconds. The goal was 3.00000 seconds.`;
-    }
   </script>
 </body>
 </html>
